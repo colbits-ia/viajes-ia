@@ -19,6 +19,7 @@
   padding: 40px;
   flex: 1;
   max-width: 800px;
+  margin: 0 auto;
   animation: fadeIn 0.5s ease-in;
 }
 
