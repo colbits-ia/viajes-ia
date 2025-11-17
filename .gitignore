@@ -25,6 +25,7 @@ dist-ssr/
 *.swp
 *.swo
 *~
+itinerario/
 
 # OS
 .DS_Store
