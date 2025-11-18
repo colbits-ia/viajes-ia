@@ -249,26 +249,26 @@ function App() {
         yPosition += 10
       }
 
-      // 4. Resumen con lo que ha dicho la IA
+      // 4. Respuesta completa de la IA
       if (historial.length > 0) {
         pdf.setFontSize(14)
         pdf.setTextColor(30, 64, 175)
-        pdf.text('Resumen del Itinerario', 20, yPosition)
+        pdf.text('Itinerario Completo', 20, yPosition)
         yPosition += 10
 
-        // Tomar la primera respuesta de Alex y crear un resumen
+        // Tomar la primera respuesta de Alex completa
         const primeraRespuesta = historial[0].respuesta
-        const resumen = crearResumenAI(primeraRespuesta)
+        const textoCompleto = limpiarTextoParaPDF(primeraRespuesta)
 
         pdf.setFontSize(11)
         pdf.setTextColor(0, 0, 0)
-        const resumenLineas = pdf.splitTextToSize(resumen, pageWidth - 40)
-        for (let i = 0; i < resumenLineas.length; i++) {
+        const textoLineas = pdf.splitTextToSize(textoCompleto, pageWidth - 40)
+        for (let i = 0; i < textoLineas.length; i++) {
           if (yPosition > pageHeight - 20) {
             pdf.addPage()
             yPosition = 20
           }
-          pdf.text(resumenLineas[i], 20, yPosition)
+          pdf.text(textoLineas[i], 20, yPosition)
           yPosition += 6
         }
         yPosition += 15
