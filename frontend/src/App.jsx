@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -106,7 +106,7 @@ function App() {
     presupuesto: '',
     preferencia: ''
   })
-  
+
   const [respuesta, setRespuesta] = useState('')
   const [fotos, setFotos] = useState([])
   const [infoPanel, setInfoPanel] = useState(null)
@@ -115,6 +115,63 @@ function App() {
   const [historial, setHistorial] = useState([])
   const [preguntaActual, setPreguntaActual] = useState('')
   const [sessionId] = useState(() => `session_${Date.now()}`)
+
+  // Estados para favoritos
+  const [favoritos, setFavoritos] = useState([])
+  const [vistaActual, setVistaActual] = useState('planificar') // 'planificar' o 'favoritos'
+
+  // Cargar favoritos del localStorage al montar el componente
+  useEffect(() => {
+    const favoritosGuardados = localStorage.getItem('viajeia_favoritos')
+    if (favoritosGuardados) {
+      try {
+        setFavoritos(JSON.parse(favoritosGuardados))
+      } catch (error) {
+        console.error('Error al cargar favoritos:', error)
+      }
+    }
+  }, [])
+
+  // Función para guardar un viaje como favorito
+  const guardarFavorito = () => {
+    if (!datosViaje.destino) return
+
+    const nuevoFavorito = {
+      id: Date.now(),
+      destino: datosViaje.destino,
+      fecha: datosViaje.fecha,
+      presupuesto: datosViaje.presupuesto,
+      preferencia: datosViaje.preferencia,
+      respuesta: respuesta,
+      fotos: fotos,
+      fechaGuardado: new Date().toLocaleString()
+    }
+
+    const nuevosFavoritos = [...favoritos, nuevoFavorito]
+    setFavoritos(nuevosFavoritos)
+    localStorage.setItem('viajeia_favoritos', JSON.stringify(nuevosFavoritos))
+  }
+
+  // Función para eliminar un favorito
+  const eliminarFavorito = (id) => {
+    const nuevosFavoritos = favoritos.filter(fav => fav.id !== id)
+    setFavoritos(nuevosFavoritos)
+    localStorage.setItem('viajeia_favoritos', JSON.stringify(nuevosFavoritos))
+  }
+
+  // Función para cargar un favorito en la vista de planificación
+  const cargarFavorito = (favorito) => {
+    setDatosViaje({
+      destino: favorito.destino,
+      fecha: favorito.fecha,
+      presupuesto: favorito.presupuesto,
+      preferencia: favorito.preferencia
+    })
+    setRespuesta(favorito.respuesta)
+    setFotos(favorito.fotos || [])
+    setFormularioCompletado(true)
+    setVistaActual('planificar')
+  }
 
   const handlePreguntaAdicional = async (e) => {
     e.preventDefault()
@@ -529,46 +586,69 @@ function App() {
       <div className="contenedor-principal">
         <div className="container">
           <h1 className="titulo">ViajeIA - Tu Asistente Personal de Viajes</h1>
-          
-          {cargando && (
+
+          {/* Navegación entre secciones */}
+          {formularioCompletado && (
+            <div className="navegacion">
+              <button
+                className={`boton-navegacion ${vistaActual === 'planificar' ? 'activo' : ''}`}
+                onClick={() => setVistaActual('planificar')}
+              >
+                ✈️ Planificar Viaje
+              </button>
+              <button
+                className={`boton-navegacion ${vistaActual === 'favoritos' ? 'activo' : ''}`}
+                onClick={() => setVistaActual('favoritos')}
+              >
+                ❤️ Mis Viajes Guardados ({favoritos.length})
+              </button>
+            </div>
+          )}
+
+          {vistaActual === 'planificar' && cargando && (
             <div className="cargando-container">
               <p className="texto-cargando">Planificando tu viaje perfecto... ✈️</p>
             </div>
           )}
 
-          {respuesta && (
+          {vistaActual === 'planificar' && respuesta && (
             <div className={`area-respuesta ${error ? 'area-error' : ''}`} id="area-respuesta-pdf">
               <div className="respuesta-header">
                 <h2 className="respuesta-titulo">{error ? 'Error:' : 'Tu Plan de Viaje:'}</h2>
-                {!error && (
-                  <button onClick={descargarPDF} className="boton-descargar-pdf">
-                    📥 Descargar mi itinerario en PDF
-                  </button>
-                )}
-              </div>
-              
-              {fotos && fotos.length > 0 && (
-                <div className="galeria-fotos" id="galeria-fotos-pdf">
-                  {fotos.map((foto, index) => (
-                    <div key={index} className="foto-container">
-                      <img 
-                        src={foto.url} 
-                        alt={foto.descripcion || `Foto de ${datosViaje.destino}`}
-                        className="foto-destino"
-                        loading="lazy"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <div className="respuesta-texto">
-                <ReactMarkdown>{respuesta}</ReactMarkdown>
-              </div>
-            </div>
+                 {!error && (
+                   <div className="botones-header">
+                     <button onClick={guardarFavorito} className="boton-guardar-favorito">
+                       ❤️ Guardar en Favoritos
+                     </button>
+                     <button onClick={descargarPDF} className="boton-descargar-pdf">
+                       📥 Descargar mi itinerario en PDF
+                     </button>
+                   </div>
+                 )}
+               </div>
+
+               {fotos && fotos.length > 0 && (
+                 <div className="galeria-fotos" id="galeria-fotos-pdf">
+                   {fotos.map((foto, index) => (
+                     <div key={index} className="foto-container">
+                       <img
+                         src={foto.url}
+                         alt={foto.descripcion || `Foto de ${datosViaje.destino}`}
+                         className="foto-destino"
+                         loading="lazy"
+                       />
+                     </div>
+                   ))}
+                 </div>
+               )}
+
+               <div className="respuesta-texto">
+                 <ReactMarkdown>{respuesta}</ReactMarkdown>
+               </div>
+             </div>
           )}
 
-          {respuesta && !error && (
+          {vistaActual === 'planificar' && respuesta && !error && (
             <>
               <div className="area-pregunta-adicional">
                 <form onSubmit={handlePreguntaAdicional} className="formulario-pregunta">
@@ -582,8 +662,8 @@ function App() {
                       disabled={cargando}
                     />
                   </div>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="boton-pregunta"
                     disabled={cargando || !preguntaActual.trim()}
                   >
@@ -617,9 +697,73 @@ function App() {
               )}
             </>
           )}
+
+          {vistaActual === 'favoritos' && (
+            <div className="seccion-favoritos">
+              <h2 className="titulo-favoritos">Mis Viajes Guardados ❤️</h2>
+
+              {favoritos.length === 0 ? (
+                <div className="favoritos-vacios">
+                  <p className="texto-vacio">Aún no has guardado ningún viaje.</p>
+                  <p className="texto-vacio">¡Planifica un viaje y guarda tus destinos favoritos!</p>
+                  <button
+                    className="boton-ir-planificar"
+                    onClick={() => setVistaActual('planificar')}
+                  >
+                    Ir a Planificar ✈️
+                  </button>
+                </div>
+              ) : (
+                <div className="lista-favoritos">
+                  {favoritos.map((favorito) => (
+                    <div key={favorito.id} className="tarjeta-favorito">
+                      <div className="favorito-header">
+                        <h3 className="favorito-destino">{favorito.destino}</h3>
+                        <button
+                          className="boton-eliminar-favorito"
+                          onClick={() => eliminarFavorito(favorito.id)}
+                          title="Eliminar de favoritos"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+
+                      <div className="favorito-detalles">
+                        <div className="favorito-info">
+                          <span className="favorito-label">📅 Fecha:</span>
+                          <span className="favorito-valor">{favorito.fecha}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">💰 Presupuesto:</span>
+                          <span className="favorito-valor">{favorito.presupuesto}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">🎯 Preferencia:</span>
+                          <span className="favorito-valor">{favorito.preferencia}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">📝 Guardado:</span>
+                          <span className="favorito-valor">{favorito.fechaGuardado}</span>
+                        </div>
+                      </div>
+
+                      <div className="favorito-acciones">
+                        <button
+                          className="boton-ver-favorito"
+                          onClick={() => cargarFavorito(favorito)}
+                        >
+                          Ver Detalles 👁️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {infoPanel && (
+        {infoPanel && vistaActual === 'planificar' && (
           <div className="panel-lateral">
             <h3 className="panel-titulo">Información Actual 📊</h3>
             <div className="panel-contenido">
