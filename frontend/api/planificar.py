@@ -3,6 +3,7 @@ import os
 import google.generativeai as genai
 import requests
 from dotenv import load_dotenv
+from http.server import BaseHTTPRequestHandler
 
 # Cargar variables de entorno
 load_dotenv()
@@ -179,72 +180,81 @@ def obtener_fotos_pixabay(destino, cantidad=3):
         print(f"Error al obtener fotos de Pixabay: {str(e)}")
         return None
 
-def handler(request):
-    """
-    Handler para Vercel serverless function
-    """
-    if request.method != 'POST':
-        return {
-            'statusCode': 405,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({'error': 'Método no permitido'})
-        }
+class handler(BaseHTTPRequestHandler):
+    def _send_json(self, payload, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(payload).encode("utf-8"))
 
-    try:
-        data = json.loads(request.body) if hasattr(request, 'body') else json.loads(request.data)
-        pregunta = data.get('pregunta', '')
-        datos_viaje = data.get('datosViaje', {})
-        session_id = data.get('session_id', 'default')
-        historial = data.get('historial', [])
+    def do_POST(self):
+        # 1) Leer y parsear el body
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length) if content_length > 0 else b"{}"
+            data = json.loads(raw_body.decode("utf-8") or "{}")
+        except Exception as e:
+            self._send_json(
+                {"error": "JSON inválido en la petición", "detalle": str(e)},
+                status=400,
+            )
+            return
 
-        if not pregunta:
-            return {
-                'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'No se proporcionó una pregunta'})
-            }
+        # 2) Copiamos aquí tu lógica anterior, pero usando _send_json en vez de return
+        try:
+            pregunta = data.get('pregunta', '')
+            datos_viaje = data.get('datosViaje', {})
+            session_id = data.get('session_id', 'default')
+            historial = data.get('historial', [])
 
-        if not model:
-            return {
-                'statusCode': 500,
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({
-                    'error': 'API key de Gemini no configurada. Por favor, configura GEMINI_API_KEY en el archivo .env'
-                })
-            }
+            if not pregunta:
+                self._send_json(
+                    {'error': 'No se proporcionó una pregunta'},
+                    status=400,
+                )
+                return
 
-        # Construir contexto del formulario si está disponible
-        contexto_formulario = ""
-        info_clima = ""
-        contexto_historial = ""
-        destino = ""
+            if not model:
+                self._send_json(
+                    {
+                        'error': 'API key de Gemini no configurada. Por favor, configura GEMINI_API_KEY en las variables de entorno de Vercel'
+                    },
+                    status=500,
+                )
+                return
 
-        # Construir contexto del historial de conversación
-        es_pregunta_adicional = historial and len(historial) > 0
+            # --- a partir de aquí puedes pegar casi tal cual tu lógica ---
 
-        if es_pregunta_adicional:
-            destino_anterior = ""
-            for conversacion in historial:
-                if 'destino' in conversacion or datos_viaje.get('destino'):
-                    destino_anterior = datos_viaje.get('destino', '')
-                    break
+            contexto_formulario = ""
+            info_clima = ""
+            contexto_historial = ""
+            destino = ""
 
-            contexto_historial = "\nCONTEXTO DE CONVERSACIONES ANTERIORES:\n"
-            contexto_historial += f"El usuario ya ha consultado sobre un viaje a {destino_anterior if destino_anterior else 'un destino'}.\n"
-            contexto_historial += "Últimas conversaciones:\n"
-            for i, conversacion in enumerate(historial[-3:]):
-                contexto_historial += f"- Usuario: {conversacion.get('pregunta', '')}\n"
-                contexto_historial += f"  Alex: {conversacion.get('respuesta', '')[:150]}...\n"
-            contexto_historial += "\nIMPORTANTE: Si el usuario pregunta sobre 'allí', 'ese lugar', 'el destino', 'el transporte allí', etc., se refiere al destino mencionado en las conversaciones anteriores.\n"
+            es_pregunta_adicional = historial and len(historial) > 0
 
-        if datos_viaje:
-            destino = datos_viaje.get('destino', '')
-            fecha = datos_viaje.get('fecha', '')
-            presupuesto = datos_viaje.get('presupuesto', '')
-            preferencia = datos_viaje.get('preferencia', '')
+            if es_pregunta_adicional:
+                destino_anterior = ""
+                for conversacion in historial:
+                    if 'destino' in conversacion or datos_viaje.get('destino'):
+                        destino_anterior = datos_viaje.get('destino', '')
+                        break
 
-            if destino or fecha or presupuesto or preferencia:
-                contexto_formulario = f"""
+                contexto_historial = "\nCONTEXTO DE CONVERSACIONES ANTERIORES:\n"
+                contexto_historial += f"El usuario ya ha consultado sobre un viaje a {destino_anterior if destino_anterior else 'un destino'}.\n"
+                contexto_historial += "Últimas conversaciones:\n"
+                for i, conversacion in enumerate(historial[-3:]):
+                    contexto_historial += f"- Usuario: {conversacion.get('pregunta', '')}\n"
+                    contexto_historial += f"  Alex: {conversacion.get('respuesta', '')[:150]}...\n"
+                contexto_historial += "\nIMPORTANTE: Si el usuario pregunta sobre 'allí', 'ese lugar', 'el destino', 'el transporte allí', etc., se refiere al destino mencionado en las conversaciones anteriores.\n"
+
+            if datos_viaje:
+                destino = datos_viaje.get('destino', '')
+                fecha = datos_viaje.get('fecha', '')
+                presupuesto = datos_viaje.get('presupuesto', '')
+                preferencia = datos_viaje.get('preferencia', '')
+
+                if destino or fecha or presupuesto or preferencia:
+                    contexto_formulario = f"""
 INFORMACIÓN DEL VIAJE DEL USUARIO:
 - Destino: {destino if destino else 'No especificado'}
 - Fecha: {fecha if fecha else 'No especificada'}
@@ -254,12 +264,11 @@ INFORMACIÓN DEL VIAJE DEL USUARIO:
 Usa esta información para personalizar tus respuestas y hacer recomendaciones más específicas.
 """
 
-        # Obtener clima del destino si está disponible
-        info_panel = {}
-        if destino:
-            clima = obtener_clima(destino)
-            if clima:
-                info_clima = f"""
+            info_panel = {}
+            if destino:
+                clima = obtener_clima(destino)
+                if clima:
+                    info_clima = f"""
 CLIMA ACTUAL EN {clima['ciudad'].upper()}, {clima['pais']}:
 - Temperatura: {clima['temperatura']}°C
 - Sensación térmica: {clima['sensacion_termica']}°C
@@ -269,23 +278,22 @@ CLIMA ACTUAL EN {clima['ciudad'].upper()}, {clima['pais']}:
 
 Incluye esta información del clima en tu respuesta, especialmente en la sección de CONSEJOS LOCALES para dar recomendaciones sobre qué ropa llevar o actividades según el clima.
 """
-                codigo_moneda = obtener_codigo_moneda_por_pais(clima.get('codigo_pais', 'US'))
-                tipo_cambio = obtener_tipo_cambio(codigo_moneda)
+                    codigo_moneda = obtener_codigo_moneda_por_pais(clima.get('codigo_pais', 'US'))
+                    tipo_cambio = obtener_tipo_cambio(codigo_moneda)
 
-                info_panel = {
-                    'temperatura': round(clima['temperatura'], 1),
-                    'descripcion_clima': clima['descripcion'],
-                    'icono_clima': clima['icono'],
-                    'diferencia_horaria': round(clima.get('diferencia_horaria', 0), 1),
-                    'tipo_cambio': tipo_cambio,
-                    'moneda': codigo_moneda,
-                    'ciudad': clima['ciudad'],
-                    'pais': clima['pais']
-                }
+                    info_panel = {
+                        'temperatura': round(clima['temperatura'], 1),
+                        'descripcion_clima': clima['descripcion'],
+                        'icono_clima': clima['icono'],
+                        'diferencia_horaria': round(clima.get('diferencia_horaria', 0), 1),
+                        'tipo_cambio': tipo_cambio,
+                        'moneda': codigo_moneda,
+                        'ciudad': clima['ciudad'],
+                        'pais': clima['pais']
+                    }
 
-        # Crear el prompt para Gemini con personalidad de Alex
-        if es_pregunta_adicional:
-            prompt = f"""Eres un generador de contenido de folletos de viaje.
+            if es_pregunta_adicional:
+                prompt = f"""Eres un generador de contenido de folletos de viaje.
 
 INSTRUCCIONES PARA INFORMACIÓN ADICIONAL:
 - Esta es una pregunta adicional sobre el viaje, proporciona información específica y relevante
@@ -303,8 +311,8 @@ PREGUNTA DEL USUARIO:
 {pregunta}
 
 Proporciona la información adicional en estilo de folleto conciso. Si se refiere a "allí", "ese lugar", etc., usa el contexto de conversaciones anteriores."""
-        else:
-            prompt = f"""Eres un generador de folletos de viaje atractivos y profesionales.
+            else:
+                prompt = f"""Eres un generador de folletos de viaje atractivos y profesionales.
 
 INSTRUCCIONES:
 - Crea un folleto de viaje informativo y visualmente atractivo
@@ -342,31 +350,35 @@ PREGUNTA DEL USUARIO:
 
 Genera el folleto de viaje completo usando exactamente el formato indicado arriba. Personaliza el contenido con la información disponible del formulario, clima e historial. Usa bullets descriptivos, emojis y lenguaje atractivo para crear una experiencia de lectura envolvente."""
 
-        # Obtener respuesta de Gemini
-        response = model.generate_content(prompt)
-        respuesta = response.text
+            response = model.generate_content(prompt)
+            respuesta = response.text
 
-        # Obtener fotos del destino
-        fotos = []
-        if destino:
-            fotos = obtener_fotos_unsplash(destino, cantidad=3)
+            fotos = []
+            if destino:
+                fotos = obtener_fotos_unsplash(destino, cantidad=3)
 
-        return {
-            'statusCode': 200,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'respuesta': respuesta,
-                'pregunta': pregunta,
-                'fotos': fotos if fotos else [],
-                'info_panel': info_panel if info_panel else {}
-            })
-        }
+            self._send_json(
+                {
+                    'respuesta': respuesta,
+                    'pregunta': pregunta,
+                    'fotos': fotos if fotos else [],
+                    'info_panel': info_panel if info_panel else {},
+                },
+                status=200,
+            )
 
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'error': f'Error al comunicarse con Gemini: {str(e)}'
-            })
-        }
+        except Exception as e:
+            # IMPORTANTE: siempre devolver JSON, incluso en error
+            self._send_json(
+                {
+                    'error': f'Error al comunicarse con Gemini: {str(e)}'
+                },
+                status=500,
+            )
+
+    def do_GET(self):
+        # opcional, para que GET devuelva algo claro
+        self._send_json(
+            {'error': 'Método no permitido. Usa POST.'},
+            status=405,
+        )
