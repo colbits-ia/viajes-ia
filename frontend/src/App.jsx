@@ -4,27 +4,46 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import './App.css'
 
-// Función para crear un resumen de la respuesta de la IA
-const crearResumenAI = (respuestaCompleta) => {
-  // Limpiar el texto de markdown
-  const textoLimpio = respuestaCompleta
+// Limpia texto para que jsPDF lo renderice bien
+const limpiarTextoParaPDF = (texto) => {
+  return texto
+    // quitar markdown básico
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
     .replace(/#{1,6}\s/g, '')
-    .replace(/•/g, '-')
-    .replace(/\n+/g, ' ')
+    // bullets y separadores raros → guion
+    .replace(/[\u2022\u2023\u25E6\u2043\u2219\u25CF\u25AA\u25AB\u00B7|]/g, '-')
+    // unir títulos en MAYÚSCULAS con letras separadas: C L I M A  A C T U A L
+    .replace(/((?:[A-ZÁÉÍÓÚÑ]\s+){2,}[A-ZÁÉÍÓÚÑ])/g, (m) =>
+      m.replace(/\s+/g, '')
+    )
+    // quitar emojis y símbolos fuera de Latin-1 (evita que salgan como þ)
+    .replace(
+      /[^\n\r\t\x20-\x7E\u00A1-\u00FF]/g,
+      ''
+    )
+    // compactar espacios
+    .replace(/\s+/g, ' ')
     .trim()
+}
+
+
+// Función para crear un resumen de la respuesta de la IA
+const crearResumenAI = (respuestaCompleta) => {
+  // Limpiar el texto de markdown
+  const textoLimpio = limpiarTextoParaPDF(
+    respuestaCompleta
+      .replace(/\n+/g, ' ')
+  )
 
   let resumen = 'Resumen del itinerario recomendado por Alex:\n\n'
-
-  // Buscar secciones principales por palabras clave
   const textoLower = textoLimpio.toLowerCase()
 
   // Extraer información de clima
   if (textoLower.includes('clima') || textoLower.includes('temperatura')) {
     const climaMatch = textoLimpio.match(/(?:CLIMA ACTUAL|CLIMA|TEMPERATURA)[^.!?]*/i)
     if (climaMatch) {
-      resumen += `• Clima: ${climaMatch[0].trim()}\n`
+      resumen += `- ${climaMatch[0].trim()}\n`
     }
   }
 
@@ -32,7 +51,7 @@ const crearResumenAI = (respuestaCompleta) => {
   if (textoLower.includes('alojamiento') || textoLower.includes('hotel')) {
     const alojamientoMatch = textoLimpio.match(/(?:ALOJAMIENTO|HOTEL)[^.!?]*/i)
     if (alojamientoMatch) {
-      resumen += `• Alojamiento: ${alojamientoMatch[0].trim()}\n`
+      resumen += `- ${alojamientoMatch[0].trim()}\n`
     }
   }
 
@@ -40,7 +59,7 @@ const crearResumenAI = (respuestaCompleta) => {
   if (textoLower.includes('comida') || textoLower.includes('restaurante')) {
     const comidaMatch = textoLimpio.match(/(?:COMIDA|RESTAURANTES)[^.!?]*/i)
     if (comidaMatch) {
-      resumen += `• Comida: ${comidaMatch[0].trim()}\n`
+      resumen += `- ${comidaMatch[0].trim()}\n`
     }
   }
 
@@ -48,7 +67,7 @@ const crearResumenAI = (respuestaCompleta) => {
   if (textoLower.includes('lugares') || textoLower.includes('atracciones')) {
     const lugaresMatch = textoLimpio.match(/(?:LUGARES IMPERDIBLES|ATRACCIONES)[^.!?]*/i)
     if (lugaresMatch) {
-      resumen += `• Lugares imperdibles: ${lugaresMatch[0].trim()}\n`
+      resumen += `- ${lugaresMatch[0].trim()}\n`
     }
   }
 
@@ -56,7 +75,7 @@ const crearResumenAI = (respuestaCompleta) => {
   if (textoLower.includes('consejos') || textoLower.includes('tips')) {
     const consejosMatch = textoLimpio.match(/(?:CONSEJOS LOCALES|TIPS)[^.!?]*/i)
     if (consejosMatch) {
-      resumen += `• Consejos locales: ${consejosMatch[0].trim()}\n`
+      resumen += `- ${consejosMatch[0].trim()}\n`
     }
   }
 
@@ -64,7 +83,7 @@ const crearResumenAI = (respuestaCompleta) => {
   if (textoLower.includes('costos') || textoLower.includes('estimación')) {
     const costosMatch = textoLimpio.match(/(?:ESTIMACIÓN DE COSTOS|COSTOS)[^.!?]*/i)
     if (costosMatch) {
-      resumen += `• Estimación de costos: ${costosMatch[0].trim()}\n`
+      resumen += `- ${costosMatch[0].trim()}\n`
     }
   }
 
@@ -75,11 +94,8 @@ const crearResumenAI = (respuestaCompleta) => {
     resumen += 'Este itinerario incluye recomendaciones personalizadas de alojamiento, comida, lugares para visitar y consejos locales.'
   }
 
-  // Limpiar emojis y caracteres extraños del resumen final
-  return resumen
-    .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
-    .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
-    .replace(/•/g, '-') // Ensure bullets are dashes
+  // Limpiar emojis del resumen final
+  return resumen;
 }
 
 function App() {
@@ -279,9 +295,8 @@ function App() {
 
           pdf.setFontSize(10)
           pdf.setTextColor(0, 0, 0)
-          const preguntaLimpia = item.pregunta
-            .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
-            .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+          const preguntaLimpia = limpiarTextoParaPDF(item.pregunta)
+
           const preguntaLineas = pdf.splitTextToSize(preguntaLimpia, pageWidth - 40)
           for (let i = 0; i < preguntaLineas.length; i++) {
             if (yPosition > pageHeight - 15) {
@@ -298,13 +313,7 @@ function App() {
           pdf.text('Respuesta:', 20, yPosition)
           yPosition += 7
 
-          const respuestaTexto = item.respuesta
-            .replace(/\*\*/g, '')
-            .replace(/\*/g, '')
-            .replace(/#{1,6}\s/g, '')
-            .replace(/•/g, '-')
-            .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
-            .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+          const respuestaTexto = limpiarTextoParaPDF(item.respuesta)
 
           pdf.setFontSize(10)
           pdf.setTextColor(0, 0, 0)
