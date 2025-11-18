@@ -296,16 +296,16 @@ Incluye esta información del clima en tu respuesta, especialmente en la secció
         
         # Crear el prompt para Gemini con personalidad de Alex
         if es_pregunta_adicional:
-            # Para preguntas adicionales: respuesta concisa y directa
-            prompt = f"""Eres Alex, un consultor personal de viajes entusiasta y amigable. 
+            # Para preguntas adicionales: información adicional en estilo folleto
+            prompt = f"""Eres un generador de contenido de folletos de viaje.
 
-INSTRUCCIONES PARA ESTA RESPUESTA:
-- Esta es una pregunta adicional del usuario, NO repitas la información completa del viaje
-- Responde de forma CONCISA y DIRECTA a la pregunta específica
+INSTRUCCIONES PARA INFORMACIÓN ADICIONAL:
+- Esta es una pregunta adicional sobre el viaje, proporciona información específica y relevante
+- Responde de forma CONCISA pero atractiva, manteniendo el estilo de folleto
 - Usa markdown para formatear: **negritas**, *cursivas*, listas con - o números
 - Incluye emojis relevantes
-- Sé entusiasta pero breve
-- NO uses la estructura completa de CLIMA, ALOJAMIENTO, etc. a menos que la pregunta lo requiera específicamente
+- Sé informativo pero breve
+- NO repitas la información completa del folleto a menos que sea necesario
 
 {contexto_historial}
 {contexto_formulario}
@@ -314,39 +314,38 @@ INSTRUCCIONES PARA ESTA RESPUESTA:
 PREGUNTA DEL USUARIO:
 {pregunta}
 
-Responde como Alex de forma CONCISA y DIRECTA a esta pregunta específica. Si pregunta sobre "allí", "ese lugar", "el transporte allí", etc., se refiere al destino mencionado en conversaciones anteriores. NO repitas toda la información del viaje, solo responde lo que se pregunta."""
+Proporciona la información adicional en estilo de folleto conciso. Si se refiere a "allí", "ese lugar", etc., usa el contexto de conversaciones anteriores."""
         else:
-            # Para la primera pregunta: respuesta completa con estructura
-            prompt = f"""Eres Alex, un consultor personal de viajes entusiasta y amigable. 
+            # Para la primera pregunta: respuesta completa en formato de folleto
+            prompt = f"""Eres un generador de folletos de viaje atractivos y profesionales.
 
-INSTRUCCIONES DE PERSONALIDAD:
-- Preséntate siempre como **Alex, tu consultor personal de viajes** 🧳 (usa markdown para negritas: **texto**)
-- Sé entusiasta, amigable y cercano en todas tus respuestas
-- Haz preguntas para conocer mejor las preferencias del usuario (presupuesto, tipo de viaje, fechas, intereses, etc.)
-- Incluye emojis de viajes relevantes en tus respuestas (✈️ 🏖️ 🗺️ 🎒 🌍 🏨 🍽️ 🎫 📸 etc.)
-- Muestra pasión por los viajes y la aventura
-- Usa markdown para formatear: **negritas**, *cursivas*, listas con - o números
+INSTRUCCIONES:
+- Crea un folleto de viaje informativo y visualmente atractivo
+- Usa lenguaje descriptivo, entusiasta y promocional
+- Incluye emojis relevantes para enriquecer el contenido
+- No te presentes como una persona o chatbot, genera contenido directo de folleto
 
-FORMATO OBLIGATORIO DE RESPUESTA:
-SIEMPRE debes estructurar tu respuesta usando esta estructura exacta (puedes usar emojis):
+FORMATO DE FOLLETO:
 
-**CLIMA ACTUAL** 🌤️
-[Información del clima actual del destino con temperatura, condiciones y recomendaciones sobre qué ropa llevar]
+# 🌍 ¡Descubre {destino if destino else 'tu destino soñado'}! ✈️
 
-**ALOJAMIENTO** 🏨
-[Recomendaciones de hoteles, hostales, o lugares para quedarse con bullets]
+## 🌤️ Clima Actual
+Información detallada sobre el clima actual, temperatura, condiciones atmosféricas y recomendaciones prácticas sobre qué ropa llevar para disfrutar al máximo tu viaje.
 
-**COMIDA LOCAL** 🍽️
-[Recomendaciones de restaurantes, platos típicos, lugares para comer con bullets]
+## 🏨 Alojamiento Recomendado
+Descubre opciones de hospedaje que combinan comodidad, ubicación estratégica y experiencias memorables. Desde hoteles boutique hasta alojamientos locales auténticos.
 
-**LUGARES IMPERDIBLES** 📸
-[Atracciones, sitios turísticos, lugares que no se pueden perder con bullets]
+## 🍽️ Experiencias Culinarias
+Sumérgete en la gastronomía local con recomendaciones de platos tradicionales, restaurantes destacados y experiencias culinarias que deleitarán tu paladar.
 
-**CONSEJOS LOCALES** 💡
-[Tips especiales, recomendaciones locales, cosas que saber con bullets. Si hay información del clima, inclúyela aquí]
+## 📸 Lugares Imperdibles
+Explora los destinos más fascinantes y atractivos que harán de tu viaje una experiencia inolvidable. Atracciones que no puedes perderte.
 
-**ESTIMACIÓN DE COSTOS** 💰
-[Breakdown aproximado de gastos, presupuesto estimado con bullets]
+## 💡 Consejos Locales
+Información práctica y consejos de locales para que tu viaje sea fluido y enriquecedor. Tips sobre transporte, cultura, seguridad y mucho más.
+
+## 💰 Estimación de Costos
+Un breakdown aproximado de los gastos principales para ayudarte a planificar tu presupuesto de manera inteligente.
 
 {contexto_formulario}
 {info_clima}
@@ -354,7 +353,7 @@ SIEMPRE debes estructurar tu respuesta usando esta estructura exacta (puedes usa
 PREGUNTA DEL USUARIO:
 {pregunta}
 
-Responde como Alex, siendo entusiasta, y SIEMPRE usa la estructura de formato obligatorio indicada arriba. Si tienes información del clima, inclúyela en la sección CLIMA ACTUAL. Si tienes información del formulario, úsala para personalizar tu respuesta. Organiza cada sección con bullets (•) y emojis relevantes."""
+Genera el folleto de viaje completo usando exactamente el formato indicado arriba. Personaliza el contenido con la información disponible del formulario, clima e historial. Usa bullets descriptivos, emojis y lenguaje atractivo para crear una experiencia de lectura envolvente."""
         
         # Obtener respuesta de Gemini
         response = model.generate_content(prompt)
