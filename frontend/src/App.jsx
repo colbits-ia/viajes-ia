@@ -476,10 +476,27 @@ function App() {
       <div className="app">
         <div className="container">
           <h1 className="titulo">ViajeIA - Tu Asistente Personal de Viajes</h1>
-          
-          <div className="formulario-inicial">
-            <h2 className="subtitulo-formulario">Cuéntanos sobre tu viaje ideal ✈️</h2>
-            <p className="descripcion-formulario">Completa este formulario rápido para personalizar tu experiencia</p>
+
+          {/* Navegación desde el formulario inicial */}
+          <div className="navegacion">
+            <button
+              className={`boton-navegacion ${vistaActual === 'planificar' ? 'activo' : ''}`}
+              onClick={() => setVistaActual('planificar')}
+            >
+              ✈️ Planificar Viaje
+            </button>
+            <button
+              className={`boton-navegacion ${vistaActual === 'favoritos' ? 'activo' : ''}`}
+              onClick={() => setVistaActual('favoritos')}
+            >
+              ❤️ Mis Viajes Guardados ({favoritos.length})
+            </button>
+          </div>
+
+          {vistaActual === 'planificar' && (
+            <div className="formulario-inicial">
+              <h2 className="subtitulo-formulario">Cuéntanos sobre tu viaje ideal ✈️</h2>
+              <p className="descripcion-formulario">Completa este formulario rápido para personalizar tu experiencia</p>
             
             <form onSubmit={handleFormularioSubmit} className="formulario-encuesta">
               <div className="campo-formulario">
@@ -576,6 +593,74 @@ function App() {
               </button>
             </form>
           </div>
+          )}
+
+          {vistaActual === 'favoritos' && (
+            <div className="seccion-favoritos">
+              <h2 className="titulo-favoritos">Mis Viajes Guardados ❤️</h2>
+
+              {favoritos.length === 0 ? (
+                <div className="favoritos-vacios">
+                  <p className="texto-vacio">Aún no has guardado ningún viaje.</p>
+                  <p className="texto-vacio">¡Planifica un viaje y guarda tus destinos favoritos!</p>
+                  <button
+                    className="boton-ir-planificar"
+                    onClick={() => setVistaActual('planificar')}
+                  >
+                    Ir a Planificar ✈️
+                  </button>
+                </div>
+              ) : (
+                <div className="lista-favoritos">
+                  {favoritos.map((favorito) => (
+                    <div key={favorito.id} className="tarjeta-favorito">
+                      <div className="favorito-header">
+                        <h3 className="favorito-destino">{favorito.destino}</h3>
+                        <button
+                          className="boton-eliminar-favorito"
+                          onClick={() => eliminarFavorito(favorito.id)}
+                          title="Eliminar de favoritos"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+
+                      <div className="favorito-detalles">
+                        <div className="favorito-info">
+                          <span className="favorito-label">📅 Fecha:</span>
+                          <span className="favorito-valor">{favorito.fecha}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">💰 Presupuesto:</span>
+                          <span className="favorito-valor">{favorito.presupuesto}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">🎯 Preferencia:</span>
+                          <span className="favorito-valor">{favorito.preferencia}</span>
+                        </div>
+                        <div className="favorito-info">
+                          <span className="favorito-label">📝 Guardado:</span>
+                          <span className="favorito-valor">{favorito.fechaGuardado}</span>
+                        </div>
+                      </div>
+
+                      <div className="favorito-acciones">
+                        <button
+                          className="boton-ver-favorito"
+                          onClick={() => {
+                            cargarFavorito(favorito);
+                            setVistaActual('planificar');
+                          }}
+                        >
+                          Ver Detalles 👁️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     )
