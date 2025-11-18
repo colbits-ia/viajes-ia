@@ -331,6 +331,23 @@ function App() {
         })
       }
 
+      // Agregar pie de página a todas las páginas
+      const totalPages = pdf.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        const pageWidth = pdf.internal.pageSize.getWidth()
+        const pageHeight = pdf.internal.pageSize.getHeight()
+
+        // Configurar fuente para el pie de página
+        pdf.setFontSize(8)
+        pdf.setTextColor(128, 128, 128) // Color gris
+
+        // Texto del pie de página: "Generado por ViajeIA" - fecha - "Página n de m"
+        const fechaActual = new Date().toLocaleDateString('es-ES')
+        const footerText = `Generado por ViajeIA - ${fechaActual} - Página ${i} de ${totalPages}`
+        pdf.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' })
+      }
+
       // Guardar PDF
       pdf.save(`Itinerario_${datosViaje.destino}_${Date.now()}.pdf`)
     } catch (error) {
