@@ -184,7 +184,7 @@ function App() {
     setError(false)
 
     try {
-      const response = await fetch('http://localhost:5000/api/planificar', {
+      const response = await fetch('/api/planificar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -426,7 +426,7 @@ function App() {
       const preguntaAutomatica = `Quiero planificar un viaje a ${datosViaje.destino} para ${datosViaje.fecha}. Mi presupuesto es ${datosViaje.presupuesto} y prefiero ${datosViaje.preferencia}. Por favor, ayúdame con recomendaciones detalladas.`
       
       try {
-        const response = await fetch('http://localhost:5000/api/planificar', {
+        const response = await fetch('/api/planificar', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
