@@ -4,6 +4,84 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import './App.css'
 
+// Función para crear un resumen de la respuesta de la IA
+const crearResumenAI = (respuestaCompleta) => {
+  // Limpiar el texto de markdown
+  const textoLimpio = respuestaCompleta
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/•/g, '-')
+    .replace(/\n+/g, ' ')
+    .trim()
+
+  let resumen = 'Resumen del itinerario recomendado por Alex:\n\n'
+
+  // Buscar secciones principales por palabras clave
+  const textoLower = textoLimpio.toLowerCase()
+
+  // Extraer información de clima
+  if (textoLower.includes('clima') || textoLower.includes('temperatura')) {
+    const climaMatch = textoLimpio.match(/(?:CLIMA ACTUAL|CLIMA|TEMPERATURA)[^.!?]*/i)
+    if (climaMatch) {
+      resumen += `• Clima: ${climaMatch[0].trim()}\n`
+    }
+  }
+
+  // Extraer información de alojamiento
+  if (textoLower.includes('alojamiento') || textoLower.includes('hotel')) {
+    const alojamientoMatch = textoLimpio.match(/(?:ALOJAMIENTO|HOTEL)[^.!?]*/i)
+    if (alojamientoMatch) {
+      resumen += `• Alojamiento: ${alojamientoMatch[0].trim()}\n`
+    }
+  }
+
+  // Extraer información de comida
+  if (textoLower.includes('comida') || textoLower.includes('restaurante')) {
+    const comidaMatch = textoLimpio.match(/(?:COMIDA|RESTAURANTES)[^.!?]*/i)
+    if (comidaMatch) {
+      resumen += `• Comida: ${comidaMatch[0].trim()}\n`
+    }
+  }
+
+  // Extraer información de lugares
+  if (textoLower.includes('lugares') || textoLower.includes('atracciones')) {
+    const lugaresMatch = textoLimpio.match(/(?:LUGARES IMPERDIBLES|ATRACCIONES)[^.!?]*/i)
+    if (lugaresMatch) {
+      resumen += `• Lugares imperdibles: ${lugaresMatch[0].trim()}\n`
+    }
+  }
+
+  // Extraer información de consejos
+  if (textoLower.includes('consejos') || textoLower.includes('tips')) {
+    const consejosMatch = textoLimpio.match(/(?:CONSEJOS LOCALES|TIPS)[^.!?]*/i)
+    if (consejosMatch) {
+      resumen += `• Consejos locales: ${consejosMatch[0].trim()}\n`
+    }
+  }
+
+  // Extraer información de costos
+  if (textoLower.includes('costos') || textoLower.includes('estimación')) {
+    const costosMatch = textoLimpio.match(/(?:ESTIMACIÓN DE COSTOS|COSTOS)[^.!?]*/i)
+    if (costosMatch) {
+      resumen += `• Estimación de costos: ${costosMatch[0].trim()}\n`
+    }
+  }
+
+  // Si no se encontraron secciones específicas, crear un resumen general
+  if (resumen === 'Resumen del itinerario recomendado por Alex:\n\n') {
+    const primerasLineas = textoLimpio.split(/[.!?]+/).slice(0, 3).join('. ').trim()
+    resumen += primerasLineas + '...\n\n'
+    resumen += 'Este itinerario incluye recomendaciones personalizadas de alojamiento, comida, lugares para visitar y consejos locales.'
+  }
+
+  // Limpiar emojis y caracteres extraños del resumen final
+  return resumen
+    .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
+    .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+    .replace(/•/g, '-') // Ensure bullets are dashes
+}
+
 function App() {
   const [formularioCompletado, setFormularioCompletado] = useState(false)
   const [datosViaje, setDatosViaje] = useState({
@@ -84,22 +162,32 @@ function App() {
       const pageHeight = pdf.internal.pageSize.getHeight()
       let yPosition = 20
 
+      // Configurar fuente por defecto para consistencia
+      pdf.setFont('helvetica', 'normal')
+
       // Logo y título
       pdf.setFontSize(24)
       pdf.setTextColor(30, 64, 175)
       pdf.text('ViajeIA', pageWidth / 2, yPosition, { align: 'center' })
       yPosition += 10
-      
+
       pdf.setFontSize(14)
       pdf.setTextColor(100, 116, 139)
       pdf.text('Tu Asistente Personal de Viajes', pageWidth / 2, yPosition, { align: 'center' })
+      yPosition += 20
+
+      // 1. Nombre del destino
+      pdf.setFontSize(18)
+      pdf.setTextColor(30, 64, 175)
+      pdf.text(datosViaje.destino, pageWidth / 2, yPosition, { align: 'center' })
       yPosition += 15
 
-      // Información del viaje
-      pdf.setFontSize(16)
+      // 2. Opciones seleccionadas por el usuario
+      pdf.setFontSize(14)
       pdf.setTextColor(30, 64, 175)
-      pdf.text(`Destino: ${datosViaje.destino}`, 20, yPosition)
-      yPosition += 8
+      pdf.text('Opciones Seleccionadas por el Usuario', 20, yPosition)
+      yPosition += 10
+
       pdf.setFontSize(12)
       pdf.setTextColor(0, 0, 0)
       pdf.text(`Fecha: ${datosViaje.fecha}`, 20, yPosition)
@@ -109,29 +197,29 @@ function App() {
       pdf.text(`Preferencia: ${datosViaje.preferencia}`, 20, yPosition)
       yPosition += 15
 
-      // Fotos
+      // 3. Imágenes del destino
       if (fotos && fotos.length > 0) {
         pdf.setFontSize(14)
         pdf.setTextColor(30, 64, 175)
-        pdf.text('Fotos del Destino', 20, yPosition)
+        pdf.text('Imágenes del Destino', 20, yPosition)
         yPosition += 10
-        
+
         for (let i = 0; i < Math.min(fotos.length, 3); i++) {
           try {
             const img = new Image()
             img.crossOrigin = 'anonymous'
             img.src = fotos[i].url
-            
+
             await new Promise((resolve, reject) => {
               img.onload = () => {
                 const imgWidth = 170
                 const imgHeight = (img.height * imgWidth) / img.width
-                
+
                 if (yPosition + imgHeight > pageHeight - 20) {
                   pdf.addPage()
                   yPosition = 20
                 }
-                
+
                 pdf.addImage(img, 'JPEG', 20, yPosition, imgWidth, imgHeight)
                 yPosition += imgHeight + 10
                 resolve()
@@ -145,53 +233,91 @@ function App() {
         yPosition += 10
       }
 
-      // Historial completo de conversaciones
+      // 4. Resumen con lo que ha dicho la IA
       if (historial.length > 0) {
         pdf.setFontSize(14)
         pdf.setTextColor(30, 64, 175)
-        pdf.text('Historial de Conversación', 20, yPosition)
+        pdf.text('Resumen del Itinerario', 20, yPosition)
         yPosition += 10
-        
-        historial.forEach((item, index) => {
-          if (yPosition > pageHeight - 30) {
+
+        // Tomar la primera respuesta de Alex y crear un resumen
+        const primeraRespuesta = historial[0].respuesta
+        const resumen = crearResumenAI(primeraRespuesta)
+
+        pdf.setFontSize(11)
+        pdf.setTextColor(0, 0, 0)
+        const resumenLineas = pdf.splitTextToSize(resumen, pageWidth - 40)
+        for (let i = 0; i < resumenLineas.length; i++) {
+          if (yPosition > pageHeight - 20) {
             pdf.addPage()
             yPosition = 20
           }
-          
-          pdf.setFontSize(11)
+          pdf.text(resumenLineas[i], 20, yPosition)
+          yPosition += 6
+        }
+        yPosition += 15
+      }
+
+      // 5. Preguntas adicionales si las hay
+      const preguntasAdicionales = historial.slice(1) // Todas menos la primera
+      if (preguntasAdicionales.length > 0) {
+        pdf.setFontSize(14)
+        pdf.setTextColor(30, 64, 175)
+        pdf.text('Preguntas Adicionales', 20, yPosition)
+        yPosition += 10
+
+        preguntasAdicionales.forEach((item, index) => {
+          if (yPosition > pageHeight - 50) {
+            pdf.addPage()
+            yPosition = 20
+          }
+
+          pdf.setFontSize(12)
           pdf.setTextColor(30, 64, 175)
           pdf.text(`Pregunta ${index + 1}:`, 20, yPosition)
-          yPosition += 7
-          
+          yPosition += 8
+
           pdf.setFontSize(10)
           pdf.setTextColor(0, 0, 0)
-          const preguntaLineas = pdf.splitTextToSize(`Tu: ${item.pregunta}`, pageWidth - 40)
+          const preguntaLimpia = item.pregunta
+            .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
+            .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+          const preguntaLineas = pdf.splitTextToSize(preguntaLimpia, pageWidth - 40)
           for (let i = 0; i < preguntaLineas.length; i++) {
-            if (yPosition > pageHeight - 20) {
+            if (yPosition > pageHeight - 15) {
               pdf.addPage()
               yPosition = 20
             }
             pdf.text(preguntaLineas[i], 20, yPosition)
             yPosition += 6
           }
-          
-          yPosition += 3
+
+          yPosition += 5
+          pdf.setFontSize(11)
+          pdf.setTextColor(30, 64, 175)
+          pdf.text('Respuesta:', 20, yPosition)
+          yPosition += 7
+
           const respuestaTexto = item.respuesta
             .replace(/\*\*/g, '')
             .replace(/\*/g, '')
             .replace(/#{1,6}\s/g, '')
             .replace(/•/g, '-')
-          
-          const respuestaLineas = pdf.splitTextToSize(`Alex: ${respuestaTexto}`, pageWidth - 40)
+            .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove emojis
+            .replace(/[^\x00-\x7F]/g, '') // Remove non-ASCII characters
+
+          pdf.setFontSize(10)
+          pdf.setTextColor(0, 0, 0)
+          const respuestaLineas = pdf.splitTextToSize(respuestaTexto, pageWidth - 40)
           for (let i = 0; i < respuestaLineas.length; i++) {
-            if (yPosition > pageHeight - 20) {
+            if (yPosition > pageHeight - 15) {
               pdf.addPage()
               yPosition = 20
             }
             pdf.text(respuestaLineas[i], 20, yPosition)
             yPosition += 6
           }
-          
+
           yPosition += 10
         })
       }
