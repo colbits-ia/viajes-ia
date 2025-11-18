@@ -1,23 +1,11 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import google.generativeai as genai
+import json
 import os
+import google.generativeai as genai
 import requests
 from dotenv import load_dotenv
-from pathlib import Path
 
-# Obtener la ruta del directorio donde está este archivo
-BASE_DIR = Path(__file__).resolve().parent
-
-# Cargar variables de entorno desde el archivo .env en el mismo directorio
-load_dotenv(dotenv_path=BASE_DIR / '.env')
-
-app = Flask(__name__)
-CORS(app)  # Permitir peticiones desde el frontend
-
-# Almacenar historial de conversaciones por sesión
-# En producción, usar una base de datos o Redis
-historial_conversaciones = {}
+# Cargar variables de entorno
+load_dotenv()
 
 # Configurar las API keys desde variables de entorno
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -28,7 +16,6 @@ EXCHANGERATE_API_KEY = os.getenv('EXCHANGERATE_API_KEY')
 model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Usar el modelo Gemini 2.5 Flash
     try:
         model = genai.GenerativeModel('models/gemini-2.5-flash')
         print("✅ Modelo configurado: models/gemini-2.5-flash")
@@ -47,18 +34,17 @@ def obtener_clima(ciudad):
         params = {
             'q': ciudad,
             'appid': OPENWEATHER_API_KEY,
-            'units': 'metric',  # Temperatura en Celsius
-            'lang': 'es'  # Respuestas en español
+            'units': 'metric',
+            'lang': 'es'
         }
-        
+
         response = requests.get(url, params=params, timeout=5)
-        
+
         if response.status_code == 200:
             data = response.json()
-            # Calcular diferencia horaria (timezone offset en segundos)
-            timezone_offset = data.get('timezone', 0)  # Offset en segundos
+            timezone_offset = data.get('timezone', 0)
             horas_diferencia = timezone_offset / 3600
-            
+
             clima = {
                 'ciudad': data['name'],
                 'pais': data['sys']['country'],
@@ -83,15 +69,13 @@ def obtener_tipo_cambio(codigo_moneda_destino='USD'):
     Obtiene el tipo de cambio usando ExchangeRate-API
     """
     try:
-        # Primero obtener el tipo de cambio base (USD)
         url = f"https://v6.exchangerate-api.com/v6/{EXCHANGERATE_API_KEY}/latest/USD"
         response = requests.get(url, timeout=5)
-        
+
         if response.status_code == 200:
             data = response.json()
             if data.get('result') == 'success':
                 tasas = data.get('conversion_rates', {})
-                # Obtener tasa para la moneda del destino
                 tasa_destino = tasas.get(codigo_moneda_destino, 1)
                 return {
                     'moneda_base': 'USD',
@@ -137,9 +121,9 @@ def obtener_fotos_unsplash(destino, cantidad=3):
             'orientation': 'landscape',
             'order_by': 'popularity'
         }
-        
+
         response = requests.get(url, headers=headers, params=params, timeout=5)
-        
+
         if response.status_code == 200:
             data = response.json()
             fotos = []
@@ -154,11 +138,9 @@ def obtener_fotos_unsplash(destino, cantidad=3):
             return fotos
         else:
             print(f"Error en Unsplash API: {response.status_code}")
-            # Si falla, intentar con Pixabay como respaldo
             return obtener_fotos_pixabay(destino, cantidad)
     except Exception as e:
         print(f"Error al obtener fotos de Unsplash: {str(e)}")
-        # Intentar con Pixabay como alternativa
         return obtener_fotos_pixabay(destino, cantidad)
 
 def obtener_fotos_pixabay(destino, cantidad=3):
@@ -166,7 +148,6 @@ def obtener_fotos_pixabay(destino, cantidad=3):
     Obtiene fotos de un destino usando Pixabay API (no requiere key para uso básico)
     """
     try:
-        # Pixabay permite acceso sin key con límites
         url = "https://pixabay.com/api/"
         params = {
             'key': '9656065-a4094594c34c9ac8c8dfde6dc',  # Key pública de demo
@@ -177,9 +158,9 @@ def obtener_fotos_pixabay(destino, cantidad=3):
             'per_page': cantidad,
             'safesearch': 'true'
         }
-        
+
         response = requests.get(url, params=params, timeout=5)
-        
+
         if response.status_code == 200:
             data = response.json()
             fotos = []
@@ -198,59 +179,70 @@ def obtener_fotos_pixabay(destino, cantidad=3):
         print(f"Error al obtener fotos de Pixabay: {str(e)}")
         return None
 
-@app.route('/api/planificar', methods=['POST'])
-def planificar_viaje():
+def handler(request):
     """
-    Endpoint para recibir preguntas del usuario sobre planificación de viajes
-    y obtener respuestas de Gemini
+    Handler para Vercel serverless function
     """
-    data = request.get_json()
-    pregunta = data.get('pregunta', '')
-    datos_viaje = data.get('datosViaje', {})
-    session_id = data.get('session_id', 'default')
-    historial = data.get('historial', [])
-    
-    if not pregunta:
-        return jsonify({'error': 'No se proporcionó una pregunta'}), 400
-    
-    # Si no hay API key configurada, devolver mensaje de error
-    if not model:
-        return jsonify({
-            'error': 'API key de Gemini no configurada. Por favor, configura GEMINI_API_KEY en el archivo .env'
-        }), 500
-    
+    if request.method != 'POST':
+        return {
+            'statusCode': 405,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': 'Método no permitido'})
+        }
+
     try:
+        data = json.loads(request.body) if hasattr(request, 'body') else json.loads(request.data)
+        pregunta = data.get('pregunta', '')
+        datos_viaje = data.get('datosViaje', {})
+        session_id = data.get('session_id', 'default')
+        historial = data.get('historial', [])
+
+        if not pregunta:
+            return {
+                'statusCode': 400,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({'error': 'No se proporcionó una pregunta'})
+            }
+
+        if not model:
+            return {
+                'statusCode': 500,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'error': 'API key de Gemini no configurada. Por favor, configura GEMINI_API_KEY en el archivo .env'
+                })
+            }
+
         # Construir contexto del formulario si está disponible
         contexto_formulario = ""
         info_clima = ""
         contexto_historial = ""
         destino = ""
-        
+
         # Construir contexto del historial de conversación
         es_pregunta_adicional = historial and len(historial) > 0
-        
+
         if es_pregunta_adicional:
-            # Extraer información del destino de conversaciones anteriores
             destino_anterior = ""
             for conversacion in historial:
                 if 'destino' in conversacion or datos_viaje.get('destino'):
                     destino_anterior = datos_viaje.get('destino', '')
                     break
-            
+
             contexto_historial = "\nCONTEXTO DE CONVERSACIONES ANTERIORES:\n"
             contexto_historial += f"El usuario ya ha consultado sobre un viaje a {destino_anterior if destino_anterior else 'un destino'}.\n"
             contexto_historial += "Últimas conversaciones:\n"
-            for i, conversacion in enumerate(historial[-3:]):  # Últimas 3 conversaciones
+            for i, conversacion in enumerate(historial[-3:]):
                 contexto_historial += f"- Usuario: {conversacion.get('pregunta', '')}\n"
                 contexto_historial += f"  Alex: {conversacion.get('respuesta', '')[:150]}...\n"
             contexto_historial += "\nIMPORTANTE: Si el usuario pregunta sobre 'allí', 'ese lugar', 'el destino', 'el transporte allí', etc., se refiere al destino mencionado en las conversaciones anteriores.\n"
-        
+
         if datos_viaje:
             destino = datos_viaje.get('destino', '')
             fecha = datos_viaje.get('fecha', '')
             presupuesto = datos_viaje.get('presupuesto', '')
             preferencia = datos_viaje.get('preferencia', '')
-            
+
             if destino or fecha or presupuesto or preferencia:
                 contexto_formulario = f"""
 INFORMACIÓN DEL VIAJE DEL USUARIO:
@@ -261,7 +253,7 @@ INFORMACIÓN DEL VIAJE DEL USUARIO:
 
 Usa esta información para personalizar tus respuestas y hacer recomendaciones más específicas.
 """
-        
+
         # Obtener clima del destino si está disponible
         info_panel = {}
         if destino:
@@ -277,10 +269,9 @@ CLIMA ACTUAL EN {clima['ciudad'].upper()}, {clima['pais']}:
 
 Incluye esta información del clima en tu respuesta, especialmente en la sección de CONSEJOS LOCALES para dar recomendaciones sobre qué ropa llevar o actividades según el clima.
 """
-                # Preparar información para el panel lateral
                 codigo_moneda = obtener_codigo_moneda_por_pais(clima.get('codigo_pais', 'US'))
                 tipo_cambio = obtener_tipo_cambio(codigo_moneda)
-                
+
                 info_panel = {
                     'temperatura': round(clima['temperatura'], 1),
                     'descripcion_clima': clima['descripcion'],
@@ -291,10 +282,9 @@ Incluye esta información del clima en tu respuesta, especialmente en la secció
                     'ciudad': clima['ciudad'],
                     'pais': clima['pais']
                 }
-        
+
         # Crear el prompt para Gemini con personalidad de Alex
         if es_pregunta_adicional:
-            # Para preguntas adicionales: información adicional en estilo folleto
             prompt = f"""Eres un generador de contenido de folletos de viaje.
 
 INSTRUCCIONES PARA INFORMACIÓN ADICIONAL:
@@ -314,7 +304,6 @@ PREGUNTA DEL USUARIO:
 
 Proporciona la información adicional en estilo de folleto conciso. Si se refiere a "allí", "ese lugar", etc., usa el contexto de conversaciones anteriores."""
         else:
-            # Para la primera pregunta: respuesta completa en formato de folleto
             prompt = f"""Eres un generador de folletos de viaje atractivos y profesionales.
 
 INSTRUCCIONES:
@@ -352,33 +341,32 @@ PREGUNTA DEL USUARIO:
 {pregunta}
 
 Genera el folleto de viaje completo usando exactamente el formato indicado arriba. Personaliza el contenido con la información disponible del formulario, clima e historial. Usa bullets descriptivos, emojis y lenguaje atractivo para crear una experiencia de lectura envolvente."""
-        
+
         # Obtener respuesta de Gemini
         response = model.generate_content(prompt)
         respuesta = response.text
-        
+
         # Obtener fotos del destino
         fotos = []
         if destino:
             fotos = obtener_fotos_unsplash(destino, cantidad=3)
-        
-        return jsonify({
-            'respuesta': respuesta,
-            'pregunta': pregunta,
-            'fotos': fotos if fotos else [],
-            'info_panel': info_panel if info_panel else {}
-        })
-    
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'respuesta': respuesta,
+                'pregunta': pregunta,
+                'fotos': fotos if fotos else [],
+                'info_panel': info_panel if info_panel else {}
+            })
+        }
+
     except Exception as e:
-        return jsonify({
-            'error': f'Error al comunicarse con Gemini: {str(e)}'
-        }), 500
-
-@app.route('/api/health', methods=['GET'])
-def health():
-    """Endpoint de salud para verificar que el servidor está funcionando"""
-    return jsonify({'status': 'ok', 'message': 'Servidor funcionando correctamente'})
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
-
+        return {
+            'statusCode': 500,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({
+                'error': f'Error al comunicarse con Gemini: {str(e)}'
+            })
+        }
