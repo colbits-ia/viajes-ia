@@ -401,7 +401,7 @@ function App() {
 
         // Texto del pie de página: "Generado por ViajeIA" - fecha - "Página n de m"
         const fechaActual = new Date().toLocaleDateString('es-ES')
-        const footerText = `Generado por ViajeIA - ${fechaActual} - Página ${i} de ${totalPages}`
+        const footerText = `Generado por ViajeIA by Colbits - ${fechaActual} - Página ${i} de ${totalPages}`
         pdf.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' })
       }
 
@@ -475,7 +475,7 @@ function App() {
     return (
       <div className="app">
         <div className="container">
-          <h1 className="titulo">ViajeIA - Tu Asistente Personal de Viajes</h1>
+          <h1 className="titulo">ViajeIA by Colbits - Tu Asistente Personal de Viajes</h1>
 
           {/* Navegación desde el formulario inicial */}
           <div className="navegacion">
@@ -670,7 +670,7 @@ function App() {
     <div className="app">
       <div className="contenedor-principal">
         <div className="container">
-          <h1 className="titulo">ViajeIA - Tu Asistente Personal de Viajes</h1>
+          <h1 className="titulo">ViajeIA by Colbits - Tu Asistente Personal de Viajes</h1>
 
           {/* Navegación entre secciones */}
           {formularioCompletado && (
